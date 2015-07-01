@@ -1,0 +1,110 @@
+//Used in Windows Forms Applications
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.IO;
+
+namespace WindowsFormsApplication1
+{
+    public partial class Main : Form
+    {
+        public Main()
+        {
+            InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        public string GetFolderLoc()
+        {
+            FolderBrowserDialog fbd = new FolderBrowserDialog();
+            DialogResult result = fbd.ShowDialog();
+
+            return fbd.SelectedPath.ToString();
+        }
+
+        private void btnUpdateIE_Click(object sender, EventArgs e)
+        {
+            lblLoc_IE.Text = GetFolderLoc();
+        }
+        
+        private void button1_Click(object sender, EventArgs e)
+        {
+            lblLoc_FF.Text = GetFolderLoc();
+        }
+
+        
+        private void btnUpdateLoc_BU_Click(object sender, EventArgs e)
+        {
+            lblLoc_BU.Text = GetFolderLoc();
+        }
+
+        private void btnClose_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private void btnRun_Click(object sender, EventArgs e)
+        {
+            string strBULoc = lblLoc_BU.Text;
+            string strIELoc = lblLoc_IE.Text;
+            string strChromeLoc = lblLoc_Chrome.Text;
+            string strFFLoc = lblLoc_FF.Text;
+
+            if (strBULoc == "") 
+            {
+                lblMsg.Text = "Please Select Backup Location";
+                return; 
+            }
+            
+            if (strIELoc != "") 
+            {
+                Copy(strIELoc, strBULoc + "/" + "IE");
+            }
+
+            if (strChromeLoc != "")
+            {
+                String SourcePath = Path.Combine(strChromeLoc, "Bookmarks");
+                String DestPath = Path.Combine(strBULoc, "Chrome");
+                File.Copy(SourcePath,strBULoc + "/Chrome/Bookmarks", true);
+            }
+
+            if (strFFLoc != "")
+            {
+                Copy(strFFLoc, strBULoc + "/" + "Firefox");
+            }
+
+            lblMsg.Text = "Complete";
+        }
+
+        public void Copy(string sourceDir, string targetDir)
+        {
+            Directory.CreateDirectory(targetDir);
+
+            try
+            {
+                foreach (var file in Directory.GetFiles(sourceDir))
+                    File.Copy(file, Path.Combine(targetDir, Path.GetFileName(file)), true);
+
+                foreach (var directory in Directory.GetDirectories(sourceDir))
+                    Copy(directory, Path.Combine(targetDir, Path.GetFileName(directory)));
+            }
+
+            catch
+            {
+                return;
+            }
+        }
+    
+    }
+
+}

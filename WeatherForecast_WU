@@ -1,3 +1,5 @@
+//The following was made in a C# WPF Project
+
 //**********************************************Weather Class File ***************************************
 
 using System;
@@ -14,10 +16,8 @@ namespace WeatherData_Google
         {  
             Conditions conditions = new Conditions();
             XmlDocument xmlConditions = new XmlDocument();
-            XmlDocument xmlForecast = new XmlDocument();
             String strAPIKey = "a417af07153eda5c";
             xmlConditions.Load(string.Format("http://api.wunderground.com/api/{0}/conditions/q/{1}.xml", strAPIKey, location));
-            xmlForecast.Load(string.Format("http://api.wunderground.com/api/{0}/forecast/q/{1}.xml", strAPIKey, location));
             if (xmlConditions.SelectSingleNode("response/error") != null) 
             {  
                 conditions = null;  
@@ -25,12 +25,13 @@ namespace WeatherData_Google
             else 
             {  
                 conditions.City = xmlConditions.SelectSingleNode("/response/current_observation/display_location/full").InnerText;
-                conditions.Condition = xmlForecast.SelectSingleNode("/response/forecast/txt_forecast/forecastdays/forecastday/fcttext").InnerText;
-                conditions.TempF = xmlForecast.SelectSingleNode("/response/forecast/simpleforecast/forecastdays/forecastday/high/fahrenheit").InnerText;
-                conditions.TempC = xmlForecast.SelectSingleNode("/response/forecast/simpleforecast/forecastdays/forecastday/high/celsius").InnerText;
-                conditions.Humidity = xmlForecast.SelectSingleNode("/response/forecast/simpleforecast/forecastdays/forecastday/avehumidity").InnerText;
-                conditions.Wind = xmlForecast.SelectSingleNode("/response/forecast/simpleforecast/forecastdays/forecastday/maxwind/mph").InnerText;
-                conditions.Icon = xmlForecast.SelectSingleNode("/response/forecast/txt_forecast/forecastdays/forecastday/icon_url").InnerText;
+                conditions.Condition = xmlConditions.SelectSingleNode("/response/current_observation/weather").InnerText;
+                conditions.Temp_Curr = xmlConditions.SelectSingleNode("/response/current_observation/temperature_string").InnerText;
+                conditions.Humidity = xmlConditions.SelectSingleNode("/response/current_observation/relative_humidity").InnerText;
+                conditions.Wind = xmlConditions.SelectSingleNode("/response/current_observation/wind_string").InnerText + " "
+                    + xmlConditions.SelectSingleNode("/response/current_observation/wind_mph").InnerText + " mph (Direction: "
+                    + xmlConditions.SelectSingleNode("/response/current_observation/wind_dir").InnerText + ")"; 
+                conditions.Icon = xmlConditions.SelectSingleNode("/response/current_observation/icon_url").InnerText;
             }
             
             return conditions;
@@ -39,22 +40,22 @@ namespace WeatherData_Google
         public static List<Conditions> GetForecast(string location)
         { 
             List<Conditions> conditions = new List<Conditions>();
-            XmlDocument xmlConditions = new XmlDocument(); 
-            xmlConditions.Load(string.Format("http://www.google.com/ig/api?weather={0}", location)); 
-            if (xmlConditions.SelectSingleNode("xml_api_reply/weather/problem_cause") != null)  
+            XmlDocument xmlConditions = new XmlDocument();
+            String strAPIKey = "a417af07153eda5c";
+            xmlConditions.Load(string.Format("http://api.wunderground.com/api/{0}/forecast/q/{1}.xml", strAPIKey, location)); 
+            if (xmlConditions.SelectSingleNode("response/error") != null)  
             {  
                 conditions = null; 
             } 
             else 
-            {  
-                foreach (XmlNode node in xmlConditions.SelectNodes("/xml_api_reply/weather/forecast_conditions"))
+            {
+                foreach (XmlNode node in xmlConditions.SelectNodes("/response/forecast/txt_forecast/forecastdays/forecastday"))
                 { 
-                    Conditions condition = new Conditions(); 
-                    condition.City = xmlConditions.SelectSingleNode("/xml_api_reply/weather/forecast_information/city").Attributes["data"].InnerText;
-                    condition.Condition = node.SelectSingleNode("condition").Attributes["data"].InnerText;
-                    condition.High = node.SelectSingleNode("high").Attributes["data"].InnerText;
-                    condition.Low = node.SelectSingleNode("low").Attributes["data"].InnerText;
-                    condition.DayOfWeek = node.SelectSingleNode("day_of_week").Attributes["data"].InnerText;
+                    Conditions condition = new Conditions();
+                    condition.Condition = node.SelectSingleNode("fcttext").InnerText;
+                    condition.DayOfWeek = node.SelectSingleNode("title").InnerText;
+                    condition.POP = node.SelectSingleNode("pop").InnerText;
+                    condition.Icon = node.SelectSingleNode("icon_url").InnerText;
                     conditions.Add(condition);
                 }
             }
@@ -67,13 +68,14 @@ namespace WeatherData_Google
         string city = "No Data";
         string dayOfWeek = DateTime.Now.DayOfWeek.ToString();
         string condition = "No Data";
-        string tempF = "No Data";
-        string tempC = "No Data";
+        string temp_curr = "No Data";
+        string temp_FeelsLike = "No Data";
         string humidity = "No Data"; 
         string wind = "No Data";
         string high = "No Data"; 
         string low = "No Data";
         string icon = "";
+        string pop = "No Data";
 
         public string City
         {  
@@ -87,18 +89,18 @@ namespace WeatherData_Google
             set { condition = value; }
         }  
 
-        public string TempF
+        public string Temp_Curr
         {  
-            get { return tempF; }
-            set { tempF = value; }
-        } 
-        
-        public string TempC
+            get { return temp_curr; }
+            set { temp_curr = value; }
+        }
+
+        public string Temp_FeelsLike
         {
-            get { return tempC; }
-            set { tempC = value; }
+            get { return temp_FeelsLike; }
+            set { temp_FeelsLike = value; }
         } 
- 
+         
         public string Humidity 
         {  
             get { return humidity; }
@@ -129,6 +131,12 @@ namespace WeatherData_Google
             set { low = value; }  
         }
 
+        public string POP
+        {
+            get { return pop; }
+            set { pop = value; }
+        }
+
         public string Icon
         {
             get { return icon; }
@@ -137,6 +145,7 @@ namespace WeatherData_Google
     } 
 
 }
+
 
 //************************************************** Main Class File **********************************************************************
 using System;
@@ -167,31 +176,98 @@ namespace WeatherData_Google
 
         private void button1_Click(object sender, RoutedEventArgs e)
         {
+            lblLoc.Content = "Loading...";
+            lblCurrCondsLabel.Content = "";
             Conditions cond = new Conditions();
             String strInputLoc = txtLoc.Text;
             cond = Weather.GetCurrentConditions(strInputLoc);
-            String strDay1 = "";
+            String strDay0 = "";
             String strLoc = "";
-            String strIcon1 = "";
+            String strIcon0 = "";
+            String strtDay = "";
+            String strtIcon = "";
+            int i = 1;
+            TextBlock tLbl = null;
+            Image tImg = null;
+
             if (cond != null)
             {
                 strLoc = "Weather Conditions for: " + cond.City;
-                strDay1 = "Conditions: " + cond.Condition;
-                strDay1 = strDay1 + System.Environment.NewLine + "Temp: " + cond.TempF + "°F (" + cond.TempC + "°C)";
-                strDay1 = strDay1 + System.Environment.NewLine + "Humidity: " + cond.Humidity;
-                strDay1 = strDay1 + System.Environment.NewLine + "Wind: " + cond.Wind;
-                strIcon1 = cond.Icon;
+                strDay0 = "Current Conditions: " + cond.Condition;
+                strDay0 = strDay0 + System.Environment.NewLine + "Temperature: " + cond.Temp_Curr;
+                strDay0 = strDay0 + System.Environment.NewLine + "Humidity: " + cond.Humidity;
+                strDay0 = strDay0 + System.Environment.NewLine + "Wind: " + cond.Wind;
+                strIcon0 = cond.Icon;
             }
             else
             {
-                strDay1 = "Error Processing Request";
+                strDay0 = "Error Processing Request";
             }
             lblLoc.Content = strLoc;
-            lblDay1.Content = strDay1;
-        
-            imgDay1.Source = new BitmapImage(new Uri(strIcon1, UriKind.Absolute));
+            lblDay0.Content = strDay0;
+            lblCurrCondsLabel.Content = "Current Conditions";
+            imgDay0.Source = new BitmapImage(new Uri(strIcon0, UriKind.Absolute));
+
+            List<Conditions> FC = new List <Conditions>();
+            FC = Weather.GetForecast(strInputLoc);
+            lblForecastLabel.Content = "Loading Forecast...";
+            if (FC != null)
+            {
+                lblForecastLabel.Content = "3 Day Forcast...";
+                foreach (Conditions c in FC)
+                {
+                    strtDay = c.DayOfWeek;
+                    strtDay = strtDay + System.Environment.NewLine + c.Condition;
+                    strtDay = strtDay + System.Environment.NewLine + "Precip: " + c.POP + "%";
+                    strtIcon = c.Icon;
+                    tLbl = (TextBlock)FindName("lblDay" + i);
+                    tLbl.Text = strtDay;
+                    tImg = (Image)FindName("imgDay" + i);
+                    tImg.Source = new BitmapImage(new Uri(strtIcon, UriKind.Absolute));
+                    i++;
+                }
+            }
+            else
+            {
+                lblForecastLabel.Content = "Error Processing Request";
+            }
         }
     }
 }
+
+
+//***************************************************************Main Window.xaml file ******************************************************************
+<Window x:Class="WeatherData_Google.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="793" Width="1190">
+    <Grid Height="680" Width="1075">
+        <Button Content="Update" Height="20" HorizontalAlignment="Left" Margin="274,12,0,0" Name="button1" VerticalAlignment="Top" Width="65" Click="button1_Click" />
+        <TextBox Height="23" HorizontalAlignment="Left" Margin="114,13,0,0" Name="txtLoc" VerticalAlignment="Top" Width="120" Text="03462" />
+        <Label  Height="126" HorizontalAlignment="Left" Margin="151,109,0,0" Name="lblDay0" VerticalAlignment="Top" Width="856" />
+        <Label  Height="28" HorizontalAlignment="Left" Margin="12,45,0,0" Name="lblLoc" VerticalAlignment="Top" Width="445" />
+        <Label Content="Enter Zip" Height="28" HorizontalAlignment="Left" Margin="36,11,0,0" Name="label1" VerticalAlignment="Top" />
+        <Image Height="126" HorizontalAlignment="Left" Margin="16,110,0,0" Name="imgDay0" Stretch="UniformToFill" VerticalAlignment="Top" Width="122" />
+        <Label Height="28" HorizontalAlignment="Left" Margin="16,76,0,0" Name="lblCurrCondsLabel" VerticalAlignment="Top" Width="180" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="16,275,0,0" Name="imgDay1" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <Label Height="28" HorizontalAlignment="Left" Margin="15,242,0,0" Name="lblForecastLabel" VerticalAlignment="Top" Width="180" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="530,275,0,0" Name="imgDay2" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="16,365,0,0" Name="imgDay3" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="530,0,0,249" Name="imgDay4" Stretch="UniformToFill" VerticalAlignment="Bottom" Width="62" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="15,456,0,0" Name="imgDay5" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="530,456,0,0" Name="imgDay6" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="15,548,0,0" Name="imgDay7" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <Image Height="65" HorizontalAlignment="Left" Margin="530,548,0,0" Name="imgDay8" Stretch="UniformToFill" VerticalAlignment="Top" Width="62" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="84,275,0,0" Name="lblDay1" VerticalAlignment="Top" Width="373" TextWrapping="WrapWithOverflow" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="598,275,0,0" Name="lblDay2" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="409" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="84,365,0,0" Name="lblDay3" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="373" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="598,365,0,0" Name="lblDay4" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="409" />
+        <TextBlock Height="89" Margin="84,456,0,0" Name="lblDay5" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" HorizontalAlignment="Left" Width="373" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="599,456,0,0" Name="lblDay6" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="408" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="84,548,0,0" Name="lblDay7" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="373" />
+        <TextBlock Height="89" HorizontalAlignment="Left" Margin="599,548,0,0" Name="lblDay8" TextWrapping="WrapWithOverflow" VerticalAlignment="Top" Width="408" />
+    </Grid>
+</Window>
+
 
 
